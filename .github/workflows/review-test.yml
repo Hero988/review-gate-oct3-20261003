@@ -1,0 +1,41 @@
+name: Review rule test
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        type: choice
+        required: true
+        options:
+          - create
+          - update
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Push benign change
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PHASE: ${{ inputs.phase }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if [ "$PHASE" = 'create' ]; then
+            git checkout -b rule-test
+            printf 'first\n' > marker.txt
+          else
+            git fetch origin rule-test
+            git checkout -B rule-test origin/rule-test
+            printf 'second\n' >> marker.txt
+          fi
+          git add marker.txt
+          git commit -m "Benign $PHASE review-rule test"
+          git push -u origin rule-test
+          if [ "$PHASE" = 'create' ]; then
+            gh pr create --base main --head rule-test --title 'Benign review rule semantics test' --body 'Tester-owned repository. No merge planned.'
+          fi
